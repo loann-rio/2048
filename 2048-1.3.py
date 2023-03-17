@@ -107,7 +107,6 @@ class Window:
         pygame.display.flip()
 
     def resize_window(self):
-        print("hello")
         self.height = self.screen.get_height()
         self.width = self.screen.get_width()
 
@@ -135,45 +134,43 @@ class Game:
         # init score:
         self.score:int = 0
         self.bestScore:int = 0
+        self.lastScore:int = 0
 
         # movement variable:
         self.direction:int = 0
-        self.pressed:bool = False
 
         # first movement:
         self.board[random.randrange(0, 4), random.randrange(0, 4)] = 2
+
+    def save(self):
+        with open("game.save", "wb") as f:
+            pickle.dump(self, f)
 
     def manage_event(self, event:pygame.event, window):
 
         match event.type:
             case pygame.QUIT:
-                return False
+                return True
             case pygame.KEYUP:
                 self.movement(event)
                 window.draw(self.board, self.score, self.bestScore)
             case pygame.MOUSEBUTTONUP:
-                self.mouse()
+                self.mouse(window)
                 window.draw(self.board, self.score, self.bestScore)
             case pygame.VIDEORESIZE:
                 window.resize_window()
                 window.draw(self.board, self.score, self.bestScore)
-        
-        return True
 
-    def movement(self, event):
-
-        # get direction from event
-        direction = {82:1, 80:0, 81:3, 79:2}[event.scancode]
-        print(direction)
+        self.save()
         
-        # save last move:
-        for i in range(4):
-            for j in range(4):
-                self.lastmove[i, j] = self.board[i, j]
+        return False
+    
+    def getNextStep(self, direction, board):
 
         # rotate the matrix in the right direction
-        self.board = np.rot90(self.board, 5-direction)
-        
+        board = np.rot90(board, 5-direction)
+        score = 0
+
         a = 0
         change = True
         while change:
@@ -181,29 +178,49 @@ class Game:
             for i in range(3):
                 for j in range(4):
                     # if the tile can move to the right:
-                    if self.board[j, i] == 0 and self.board[j, i + 1] != 0:
+                    if board[j, i] == 0 and board[j, i + 1] != 0:
 
-                        self.board[j, i] = self.board[j, i + 1]
-                        self.board[j, i + 1] = 0
+                        board[j, i] = board[j, i + 1]
+                        board[j, i + 1] = 0
                         change = True
                         a = 1
 
                     # merge two tiles
-                    if self.board[j, i + 1] == self.board[j, i] and self.board[j, i] > 0:
-                        self.board[j, i] *= -2
-                        self.board[j, i + 1] = 0
+                    if board[j, i + 1] == board[j, i] and board[j, i] > 0:
+                        board[j, i] *= -2
+                        board[j, i + 1] = 0
 
                         # update score
-                        self.score -= self.board[j, i]
+                        score -= board[j, i]
 
                         change = True
                         a = 1
         
         # rotate back the matrix
-        self.board = np.rot90(self.board, direction-1)
+        board = np.rot90(board, direction-1)
 
-        # if we hade any change add new tile:
+        
+        # put back merged number to positive value
+        board = np.absolute(board)
+
+        return a, board, score
+
+    def movement(self, event):
+
+        # get direction from event
+        d = [80, 82, 79, 81]
+        if event.scancode in d:
+            direction = d.index(event.scancode)
+        else:
+            # the event is not a movement request
+            return
+        
+        # if we hade any change save last move and add new tile:
         if a == 1:
+            # save last move
+            self.lastmove = np.array(self.board, copy=True)
+
+            # take rand pos
             position = random.randrange(0, 4), random.randrange(0, 4)
             # while the choosen pos is occupied
             while self.board[position] != 0:
@@ -212,17 +229,34 @@ class Game:
             # add a random number btw 2 and 4 at the choosen position
             self.board[position] = random.choices([2, 4], weights=(10, 3), k=1)[0]
 
-        # put back merged number to positive value
-        self.board = np.absolute(self.board)
+
+        # save last score:
+        self.lastScore = self.score
+
+
+
 
         # update best score
         if self.score > self.bestScore:
             self.bestScore = self.score
 
 
-    def mouse(self):
-        pass
+    def mouse(self, window:Window):
+        x, y = pygame.mouse.get_pos()
+        if min(window.width, window.height)//9 < x < min(window.width, window.height)//9 + window.size_image+2 and  min(window.width, window.height)//4 < y < min(window.width, window.height)//4+window.size_image+2:
+            # set back to last move
+            self.board = np.array(self.lastmove, copy=True)
 
+            if self.score == self.bestScore:
+                self.bestScore = self.lastScore
+
+            self.score = self.lastScore
+
+        if min(window.width, window.height)//3.4 < x < min(window.width, window.height)//3.4 + window.size_image+2 and  min(window.width, window.height)//4 < y < min(window.width, window.height)//4+window.size_image+2:
+            # restart:
+            bestScore = self.bestScore
+            self.__init__()
+            self.bestScore = bestScore
   
     
 
@@ -230,6 +264,14 @@ class Game:
 
 
 game = Game()
+
+try:
+    with open('game.save', 'rb') as f:
+        game = pickle.load(f)
+except:
+    print("save not found")
+    game.save()
+
 window = Window()
 window.draw(game.board, game.score, game.bestScore)
 
@@ -237,7 +279,7 @@ done = False
 while not done:
     event = pygame.event.wait()
 
-    game.manage_event(event, window)
+    done = game.manage_event(event, window)
 
     
 
