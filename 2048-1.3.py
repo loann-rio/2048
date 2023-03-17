@@ -124,7 +124,6 @@ class Window:
         self.font_number = pygame.font.Font(None, int(min(self.width, self.height)/13))
         self.font_title = pygame.font.Font(None, int(min(self.width, self.height)/4))
 
-
 class Game:
     def __init__(self) -> None:
         # init board:
@@ -151,13 +150,23 @@ class Game:
         match event.type:
             case pygame.QUIT:
                 return True
+            
             case pygame.KEYUP:
+                # if any key is pressed apply requested movement:
+
                 self.movement(event)
                 window.draw(self.board, self.score, self.bestScore)
+
+
             case pygame.MOUSEBUTTONUP:
+                # if any mouse click is detected:
+
                 self.mouse(window)
                 window.draw(self.board, self.score, self.bestScore)
+
             case pygame.VIDEORESIZE:
+                # if the window is resized:
+
                 window.resize_window()
                 window.draw(self.board, self.score, self.bestScore)
 
@@ -199,7 +208,6 @@ class Game:
         # rotate back the matrix
         board = np.rot90(board, direction-1)
 
-        
         # put back merged number to positive value
         board = np.absolute(board)
 
@@ -215,30 +223,55 @@ class Game:
             # the event is not a movement request
             return
         
+        a, board, newscore = self.getNextStep(direction, np.array(self.board, copy=True))
+        
         # if we hade any change save last move and add new tile:
-        if a == 1:
-            # save last move
-            self.lastmove = np.array(self.board, copy=True)
-
-            # take rand pos
-            position = random.randrange(0, 4), random.randrange(0, 4)
-            # while the choosen pos is occupied
-            while self.board[position] != 0:
-                position = random.randrange(0, 4), random.randrange(0, 4)
-
-            # add a random number btw 2 and 4 at the choosen position
-            self.board[position] = random.choices([2, 4], weights=(10, 3), k=1)[0]
-
-
+        if a != 1:
+            return
+         
+        # save last move
+        self.lastmove = np.array(self.board, copy=True)
+        
+        # update board
+        self.board = board
+        
         # save last score:
         self.lastScore = self.score
 
-
-
-
+        # update score
+        self.score += newscore
+        
         # update best score
         if self.score > self.bestScore:
             self.bestScore = self.score
+
+        # take rand pos
+        position = random.randrange(0, 4), random.randrange(0, 4)
+
+        # while the choosen pos is occupied
+        while self.board[position] != 0:
+            position = random.randrange(0, 4), random.randrange(0, 4)
+
+        # add a random number btw 2 and 4 at the choosen position
+        self.board[position] = random.choices([2, 4], weights=(10, 3), k=1)[0]
+
+
+
+        
+
+
+    def checkEndGame(self):
+        # if there is no empty cells:
+        if np.count_nonzero(self.board):
+            a0, _, _ = self.getNextStep(0, np.array(self.board, copy=True))
+            a1, _, _ = self.getNextStep(1, np.array(self.board, copy=True))
+            a2, _, _ = self.getNextStep(2, np.array(self.board, copy=True))
+            a3, _, _ = self.getNextStep(3, np.array(self.board, copy=True))
+
+            return not any([a0, a1, a2, a3])
+        return False
+
+        
 
 
     def mouse(self, window:Window):
@@ -258,9 +291,6 @@ class Game:
             self.__init__()
             self.bestScore = bestScore
   
-    
-
-
 
 
 game = Game()
