@@ -40,18 +40,22 @@ class Window:
               (247, 255, 60), (223, 218, 0), (253, 238, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0),
               (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
 
-    def draw(self, board:np.array, score:int, bestScore:int):
+    def draw(self, board:np.array, score:int, bestScore:int, isOver:int):
         self.screen.fill([193, 191, 177])
 
+        boardSurface = pygame.surface.Surface((self.size_main_rect, self.size_main_rect), pygame.SRCALPHA, 32)
+
+        # blur the table if Game Over
+        
         for y in range(4):
             for x in range(4):
                 if board[x, y] != 0:
                     
                     pygame.draw.rect(
-                        self.screen, 
+                        boardSurface, 
                         self.colors[int(np.log2(board[x, y]))-1], 
-                            [self.X_offset + x*self.size_main_rect//4, 
-                             self.Y_offset + y*self.size_main_rect//4, 
+                            [x*self.size_main_rect//4, 
+                             y*self.size_main_rect//4, 
                              self.size_main_rect//4, 
                              self.size_main_rect//4]
                         )
@@ -65,11 +69,46 @@ class Window:
                     width = numberSurface.get_width()
                     height = numberSurface.get_height()
 
-                    self.screen.blit(
+                    boardSurface.blit(
                         numberSurface,
-                        (int(self.X_offset + x*self.size_main_rect//4 + self.size_main_rect//8 - width//2),
-                         int(self.Y_offset + y*self.size_main_rect//4 + self.size_main_rect//8 - height//2))
+                        (int(x*self.size_main_rect//4 + self.size_main_rect//8 - width//2),
+                         int(y*self.size_main_rect//4 + self.size_main_rect//8 - height//2))
                     )
+
+            # draw table lines:
+            for i in range(5):
+                pygame.draw.line(boardSurface, (127, 127, 127), 
+                                (i*self.size_main_rect//4, 0), 
+                                (i*self.size_main_rect//4, self.size_main_rect), 3)
+                
+                pygame.draw.line(boardSurface, (127, 127, 127), 
+                                (0, i*self.size_main_rect//4), 
+                                (self.size_main_rect, i*self.size_main_rect//4), 3)
+
+        if isOver:
+            #boardSurface.fill((0, 0, 0, 120))
+            boardSurface.set_alpha(120)
+            scale = 1.0/float(4)
+            surf_size = boardSurface.get_size()
+
+            scale_size = (int(surf_size[0]*scale), int(surf_size[1]*scale))
+
+            surf = pygame.transform.smoothscale(boardSurface, scale_size)
+
+            boardSurface = pygame.transform.smoothscale(surf, surf_size)
+
+        # outer line
+        for i in range(0, 5, 4):
+            pygame.draw.line(boardSurface, (127, 127, 127), 
+                            (i*self.size_main_rect//4, 0), 
+                            (i*self.size_main_rect//4, self.size_main_rect), 3)
+            
+            pygame.draw.line(boardSurface, (127, 127, 127), 
+                            (0, i*self.size_main_rect//4), 
+                            (self.size_main_rect, i*self.size_main_rect//4), 3)
+
+
+        self.screen.blit(boardSurface, (self.X_offset, self.Y_offset))
 
         # render title
         self.screen.blit(self.font_title.render(str(2048), True, (50, 50, 50)),
@@ -94,16 +133,9 @@ class Window:
         self.screen.blit(self.back_img, (min(self.width, self.height)//9 +1, min(self.width, self.height)//4 +1))
         self.screen.blit(self.restart_img, (min(self.width, self.height)//3.4 +1, min(self.width, self.height)//4 +1))
 
-        # draw table lines:
-        for i in range(5):
-            pygame.draw.line(self.screen, (127, 127, 127), 
-                             (self.X_offset + i*self.size_main_rect//4, self.Y_offset), 
-                             (self.X_offset + i*self.size_main_rect//4, self.Y_offset+self.size_main_rect), 3)
-             
-            pygame.draw.line(self.screen, (127, 127, 127), 
-                             (self.X_offset, self.Y_offset + i*self.size_main_rect//4), 
-                             (self.X_offset + self.size_main_rect, self.Y_offset+i*self.size_main_rect//4), 3)
+       
             
+                
         pygame.display.flip()
 
     def resize_window(self):
@@ -141,6 +173,9 @@ class Game:
         # first movement:
         self.board[random.randrange(0, 4), random.randrange(0, 4)] = 2
 
+        # end game
+        self.isOver:bool = False 
+
     def save(self):
         with open("game.save", "wb") as f:
             pickle.dump(self, f)
@@ -154,21 +189,28 @@ class Game:
             case pygame.KEYUP:
                 # if any key is pressed apply requested movement:
 
-                self.movement(event)
-                window.draw(self.board, self.score, self.bestScore)
+                # if the game is not over:
+                if not self.isOver:
+                    # apply movement
+                    self.movement(event)
 
+                    # check if game is over
+                    self.isOver = self.checkEndGame()
+
+                    # draw the window
+                    window.draw(self.board, self.score, self.bestScore, self.isOver)
 
             case pygame.MOUSEBUTTONUP:
                 # if any mouse click is detected:
 
                 self.mouse(window)
-                window.draw(self.board, self.score, self.bestScore)
+                window.draw(self.board, self.score, self.bestScore, self.isOver)
 
             case pygame.VIDEORESIZE:
                 # if the window is resized:
 
                 window.resize_window()
-                window.draw(self.board, self.score, self.bestScore)
+                window.draw(self.board, self.score, self.bestScore, self.isOver)
 
         self.save()
         
@@ -285,6 +327,8 @@ class Game:
 
             self.score = self.lastScore
 
+            self.isOver = self.checkEndGame()
+
         if min(window.width, window.height)//3.4 < x < min(window.width, window.height)//3.4 + window.size_image+2 and  min(window.width, window.height)//4 < y < min(window.width, window.height)//4+window.size_image+2:
             # restart:
             bestScore = self.bestScore
@@ -303,7 +347,7 @@ except:
     game.save()
 
 window = Window()
-window.draw(game.board, game.score, game.bestScore)
+window.draw(game.board, game.score, game.bestScore, False)
 
 done = False
 while not done:
