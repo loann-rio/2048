@@ -3,6 +3,7 @@ import numpy as np
 import random
 import pickle
 import os
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 pygame.init()
@@ -32,7 +33,8 @@ class Window:
         self.restart_img = pygame.transform.scale(self.restart_img, (self.size_image, self.size_image))
 
         # init fonts:
-        self.font_number = pygame.font.Font(None, int(self.width/13))
+        self.font_number = pygame.font.Font(None, 42)
+        self.font_game_over = pygame.font.Font(None, 100)
         self.font_title = pygame.font.Font(None, int(self.width/4))
 
         # tiles colors:
@@ -86,8 +88,7 @@ class Window:
                                 (self.size_main_rect, i*self.size_main_rect//4), 3)
 
         if isOver:
-            #boardSurface.fill((0, 0, 0, 120))
-            boardSurface.set_alpha(120)
+            boardSurface.set_alpha(200)
             scale = 1.0/float(4)
             surf_size = boardSurface.get_size()
 
@@ -96,6 +97,9 @@ class Window:
             surf = pygame.transform.smoothscale(boardSurface, scale_size)
 
             boardSurface = pygame.transform.smoothscale(surf, surf_size)
+
+            youloseText = self.font_game_over.render('game over', True, (30, 30, 30))
+            boardSurface.blit(youloseText, ((self.size_main_rect - youloseText.get_width())//2, (self.size_main_rect - youloseText.get_height())//2) )
 
         # outer line
         for i in range(0, 5, 4):
@@ -132,9 +136,6 @@ class Window:
         
         self.screen.blit(self.back_img, (min(self.width, self.height)//9 +1, min(self.width, self.height)//4 +1))
         self.screen.blit(self.restart_img, (min(self.width, self.height)//3.4 +1, min(self.width, self.height)//4 +1))
-
-       
-            
                 
         pygame.display.flip()
 
@@ -354,14 +355,3 @@ while not done:
     event = pygame.event.wait()
 
     done = game.manage_event(event, window)
-
-    
-
-
-
-
-
-                    
-                        
-                    
-
